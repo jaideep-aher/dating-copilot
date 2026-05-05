@@ -1,8 +1,9 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { createClient } from "@/lib/supabase/server";
-import { FREE_GENERATIONS_PER_MONTH } from "@/lib/constants";
 import { generateWithOpenAI, mockGeneration } from "@/lib/ai/generate-replies";
+import { getQuotaState, incrementQuota } from "@/lib/generation-quota";
+import { rateLimitOrThrow } from "@/lib/simple-rate-limit";
+import { createClient } from "@/lib/supabase/server";
 
 export const maxDuration = 60;
 
@@ -13,8 +14,6 @@ const bodySchema = z.object({
   instruction: z.string().max(2000).optional(),
 });
 
-const MONTH_MS = 30 * 24 * 60 * 60 * 1000;
-
 export async function POST(req: Request) {
   const supabase = await createClient();
   const {
@@ -23,6 +22,13 @@ export async function POST(req: Request) {
 
   if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  try {
+    rateLimitOrThrow("api:generate", user.id);
+  } catch (e) {
+    const err = e as Error & { status?: number };
+    return NextResponse.json({ error: err.message ?? "Too many requests" }, { status: err.status ?? 429 });
   }
 
   let json: unknown;
@@ -57,36 +63,22 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Contact not found" }, { status: 404 });
   }
 
-  const { data: profile, error: profileError } = await supabase
+  const { allowed, used, limit, profile } = await getQuotaState(supabase, user.id);
+  if (!allowed || profile === null) {
+    return NextResponse.json(
+      { error: "Monthly generation limit reached", code: "quota", used, limit },
+      { status: 429 },
+    );
+  }
+
+  const { data: profileTone, error: profileError } = await supabase
     .from("profiles")
-    .select("generations_used, generation_period_start, default_tone")
+    .select("default_tone")
     .eq("id", user.id)
     .single();
 
-  if (profileError || !profile) {
+  if (profileError || !profileTone) {
     return NextResponse.json({ error: "Profile missing" }, { status: 400 });
-  }
-
-  const periodStart = new Date(profile.generation_period_start).getTime();
-  let used = profile.generations_used as number;
-
-  if (Date.now() - periodStart > MONTH_MS) {
-    used = 0;
-    await supabase
-      .from("profiles")
-      .update({
-        generations_used: 0,
-        generation_period_start: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      })
-      .eq("id", user.id);
-  }
-
-  if (used >= FREE_GENERATIONS_PER_MONTH) {
-    return NextResponse.json(
-      { error: "Monthly generation limit reached", code: "quota" },
-      { status: 429 },
-    );
   }
 
   let pinRows: { id: string; body: string }[] = [];
@@ -163,7 +155,7 @@ export async function POST(req: Request) {
   const payload =
     (await generateWithOpenAI({
       contactName: contact.display_name,
-      userTone: profile.default_tone ?? "neutral",
+      userTone: profileTone.default_tone ?? "neutral",
       instruction,
       contextText,
       imageParts,
@@ -186,13 +178,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Failed to save generation" }, { status: 500 });
   }
 
-  await supabase
-    .from("profiles")
-    .update({
-      generations_used: used + 1,
-      updated_at: new Date().toISOString(),
-    })
-    .eq("id", user.id);
+  await incrementQuota(supabase, user.id, used);
 
   return NextResponse.json({ id: genRow.id, ...payload });
 }

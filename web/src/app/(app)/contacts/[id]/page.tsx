@@ -8,7 +8,8 @@ import {
   submitTimelineNoteForm,
   submitTimelineScreenshotsForm,
 } from "@/app/actions/contacts";
-import { FREE_GENERATIONS_PER_MONTH, MAX_PINNED_FACTS } from "@/lib/constants";
+import { MAX_PINNED_FACTS } from "@/lib/constants";
+import { getQuotaState } from "@/lib/generation-quota";
 import { createClient } from "@/lib/supabase/server";
 import { GenerationPanel } from "@/components/generation-panel";
 
@@ -42,12 +43,9 @@ export default async function ContactDetailPage(props: PageProps) {
     notFound();
   }
 
-  const [{ data: profile }, { data: pinned }, { data: timeline }] = await Promise.all([
-    supabase
-      .from("profiles")
-      .select("generations_used, generation_period_start, default_tone")
-      .eq("id", user.id)
-      .single(),
+  const [{ data: profile }, quota, { data: pinned }, { data: timeline }] = await Promise.all([
+    supabase.from("profiles").select("default_tone").eq("id", user.id).single(),
+    getQuotaState(supabase, user.id),
     supabase
       .from("pinned_facts")
       .select("id, body, sort_order, created_at")
@@ -266,8 +264,8 @@ export default async function ContactDetailPage(props: PageProps) {
           contactName={contact.display_name}
           pinnedFacts={(pinned ?? []).map((p) => ({ id: p.id, body: p.body }))}
           quotaSummary={{
-            limit: FREE_GENERATIONS_PER_MONTH,
-            used: profile?.generations_used ?? 0,
+            limit: quota.limit,
+            used: quota.used,
           }}
           timelineItems={plannerTimeline}
         />

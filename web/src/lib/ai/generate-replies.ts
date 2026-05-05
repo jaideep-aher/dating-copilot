@@ -47,15 +47,43 @@ export async function generateWithOpenAI(input: {
   instruction?: string;
   contextText: string;
   imageParts: { url: string }[];
+  replyLengthPreset?: "short" | "medium" | "long";
+  flirtLevel?: "low" | "medium" | "high";
+  emojiPreferred?: boolean | null;
 }): Promise<GenerationPayload | null> {
   const key = process.env.OPENAI_API_KEY;
   if (!key) return null;
 
   const client = new OpenAI({ apiKey: key });
 
+  const preset = input.replyLengthPreset ?? "medium";
+  const lengthHints =
+    preset === "short"
+      ? "Each variant ≤ 55 words."
+      : preset === "long"
+        ? "Each variant may stretch toward ~220 words only when helpful."
+        : "Each variant ~90–140 words.";
+  const flirt = input.flirtLevel ?? "medium";
+  const flirtHint =
+    flirt === "low"
+      ? "Keep romantic charge subtle and friendly-by-default."
+      : flirt === "high"
+        ? "Brighter flirt allowed when reciprocity cues exist — never crude or pushy."
+        : "Warm and lightly playful unless context says otherwise.";
+  const emojiHint =
+    input.emojiPreferred === true
+      ? "Sprinkle sparingly — at most ONE emoji overall across all variants."
+      : input.emojiPreferred === false
+        ? "Do NOT use emojis."
+        : "Default to no emoji unless it clearly matches how they text you.";
+
   const system = `You are a dating communication coach. The user will send context about ONE specific person (their match). 
-Produce reply suggestions the user can copy. Never encourage harassment, coercion, stalking, or dishonesty. 
-Keep each variant under 120 words. Labels must be: safe, playful, direct (and add up to 2 more if useful: short, warm).
+Produce reply suggestions the user can copy. Never encourage harassment, coercion, stalking, or dishonesty.
+Labels must include: safe, playful, direct (you may add up to two more labels like warm or short clarifier).
+
+${lengthHints}
+${flirtHint}
+${emojiHint}
 
 Respond ONLY with valid JSON matching this shape:
 {"variants":[{"label":"string","text":"string"}],"cautions":["string"],"next_step":"string","explain":"optional string"}

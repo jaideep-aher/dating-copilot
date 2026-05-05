@@ -16,9 +16,14 @@ export default async function SettingsPage() {
   return (
     <div className="mx-auto max-w-2xl space-y-10">
       <div>
-        <Link className="text-sm text-zinc-500 underline-offset-4 hover:text-zinc-900 hover:underline" href="/contacts">
-          ← Contacts
-        </Link>
+        <div className="flex flex-wrap gap-4 text-sm text-zinc-500">
+          <Link className="underline-offset-4 hover:text-zinc-900 hover:underline" href="/contacts">
+            ← Contacts
+          </Link>
+          <Link className="underline-offset-4 hover:text-zinc-900 hover:underline" href="/settings/billing">
+            Billing · data export
+          </Link>
+        </div>
         <p className="mt-8 text-xs font-semibold uppercase tracking-[0.38em] text-amber-900">Settings</p>
         <h1 className="mt-4 text-4xl font-serif text-zinc-900">Tune your voice baseline</h1>
         <p className="mt-3 text-base text-zinc-600">Planners lean on this palette when they improvise lines for you.</p>

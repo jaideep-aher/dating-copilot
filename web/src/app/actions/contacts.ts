@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { MAX_PINNED_FACTS } from "@/lib/constants";
+import { maxContactsForProfile, type QuotaProfile } from "@/lib/entitlements";
 import { createClient } from "@/lib/supabase/server";
 
 export async function createContact(formData: FormData) {
@@ -19,6 +20,31 @@ export async function createContact(formData: FormData) {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) return { ok: false as const, error: "Sign in required." };
+
+  const { data: entProfile, error: entErr } = await supabase
+    .from("profiles")
+    .select("subscription_tier, subscription_status")
+    .eq("id", user.id)
+    .single();
+
+  if (entErr || !entProfile) {
+    return { ok: false as const, error: "Profile missing." };
+  }
+
+  const contactCap = maxContactsForProfile(entProfile as QuotaProfile);
+  if (contactCap !== null) {
+    const { count } = await supabase
+      .from("contacts")
+      .select("id", { count: "exact", head: true })
+      .eq("user_id", user.id)
+      .is("archived_at", null);
+    if ((count ?? 0) >= contactCap) {
+      return {
+        ok: false as const,
+        error: `You can track up to ${contactCap} active contacts on the free plan. Archive one or upgrade.`,
+      };
+    }
+  }
 
   const { data, error } = await supabase
     .from("contacts")
@@ -279,11 +305,15 @@ export async function deleteTimelineItem(contactId: string, itemId: string) {
 export async function updateProfile(formData: FormData): Promise<void> {
   const displayName = String(formData.get("display_name") || "").trim();
   const tone = String(formData.get("default_tone") || "neutral");
+  const timezone = String(formData.get("timezone") ?? "UTC").trim().slice(0, 80);
   const allowed = new Set(["playful", "neutral", "direct"]);
   if (!allowed.has(tone)) {
     return;
   }
   if (displayName.length > 80) {
+    return;
+  }
+  if (timezone.length < 2 || timezone.length > 80) {
     return;
   }
 
@@ -298,6 +328,7 @@ export async function updateProfile(formData: FormData): Promise<void> {
     .update({
       display_name: displayName.length ? displayName : null,
       default_tone: tone,
+      timezone,
       updated_at: new Date().toISOString(),
     })
     .eq("id", user.id);

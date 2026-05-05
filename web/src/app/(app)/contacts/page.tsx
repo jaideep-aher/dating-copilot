@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { submitContactArchive } from "@/app/actions/contacts";
-import { FREE_GENERATIONS_PER_MONTH } from "@/lib/constants";
+import { getQuotaState } from "@/lib/generation-quota";
 import { createClient } from "@/lib/supabase/server";
 
 export default async function ContactsPage(props: {
@@ -17,11 +17,7 @@ export default async function ContactsPage(props: {
   const resolvedSearch = props.searchParams ? await props.searchParams : undefined;
   const archived = resolvedSearch?.show === "archived";
 
-  const profileQuery = supabase
-    .from("profiles")
-    .select("display_name, generations_used, generation_period_start")
-    .eq("id", user.id)
-    .single();
+  const quotaQuery = getQuotaState(supabase, user.id);
 
   const contactsBase = supabase
     .from("contacts")
@@ -33,7 +29,7 @@ export default async function ContactsPage(props: {
     ? contactsBase.not("archived_at", "is", null)
     : contactsBase.is("archived_at", null);
 
-  const [{ data: profile }, { data: contacts, error }] = await Promise.all([profileQuery, contactsQuery]);
+  const [quota, { data: contacts, error }] = await Promise.all([quotaQuery, contactsQuery]);
 
   if (error || !contacts) {
     throw new Error("Could not fetch contacts.");
@@ -56,15 +52,15 @@ export default async function ContactsPage(props: {
           <p className="text-base leading-relaxed text-zinc-600">
             Each row carries its own memory — nothing merges across threads unless you do it deliberately.
           </p>
-          {profile ? (
+          {quota.profile ? (
             <p className="text-sm text-zinc-500">
               Generations consumed this quota window:&nbsp;
               <span className="font-semibold text-zinc-900">
-                {profile.generations_used}/{FREE_GENERATIONS_PER_MONTH}
+                {quota.used}/{quota.limit}
               </span>
               <span className="text-zinc-400">
                 {" "}
-                • window started {formatPeriodLabel(profile.generation_period_start)}
+                • window started {formatPeriodLabel(quota.profile.generation_period_start)}
               </span>
             </p>
           ) : null}

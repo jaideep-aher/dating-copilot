@@ -34,6 +34,9 @@ export function GenerationPanel(props: {
   const [payload, setPayload] = useState<(GenerationPayload & { id?: string }) | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [lastId, setLastId] = useState<string | null>(null);
+  const [reportDetail, setReportDetail] = useState("");
+  const [reportBusy, setReportBusy] = useState(false);
+  const [reportMessage, setReportMessage] = useState<string | null>(null);
 
   const selectedTimelineIds = useMemo(
     () => Object.entries(selectedTimeline).filter(([, v]) => v).map(([k]) => k),
@@ -60,8 +63,18 @@ export function GenerationPanel(props: {
         }),
       });
       if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        throw new Error(typeof err.error === "string" ? err.error : "Could not generate replies.");
+        const errBody = await res.json().catch(() => ({}));
+        const msg = typeof errBody.error === "string" ? errBody.error : "Could not generate replies.";
+        const code =
+          typeof errBody === "object" && errBody !== null && "code" in errBody
+            ? String((errBody as { code?: string }).code)
+            : "";
+        if (code === "quota") {
+          const used = "used" in errBody ? String((errBody as { used?: number }).used) : "?";
+          const lim = "limit" in errBody ? String((errBody as { limit?: number }).limit) : "?";
+          throw new Error(`${msg} (${used}/${lim}) — Billing has upgrade options.`);
+        }
+        throw new Error(msg);
       }
       const data = await res.json();
       setLastId(data.id as string);
@@ -86,6 +99,33 @@ export function GenerationPanel(props: {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ id: lastId, feedback: value }),
     });
+  }
+
+  async function sendReport(ev: FormEvent) {
+    ev.preventDefault();
+    setReportBusy(true);
+    setReportMessage(null);
+    try {
+      const res = await fetch("/api/reports", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          generationId: lastId,
+          contactId: props.contactId,
+          detail: reportDetail.trim() ? reportDetail.trim() : undefined,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(typeof data.error === "string" ? data.error : "Could not submit report.");
+      }
+      setReportDetail("");
+      setReportMessage("Thanks — moderation will review shortly.");
+    } catch (e) {
+      setReportMessage(e instanceof Error ? e.message : "Something went wrong.");
+    } finally {
+      setReportBusy(false);
+    }
   }
 
   async function copy(text: string) {
@@ -250,6 +290,30 @@ export function GenerationPanel(props: {
               Needs work 👎
             </button>
           </div>
+
+          <form className="space-y-3 rounded-[28px] border border-zinc-200 bg-white px-6 py-5 shadow-inner shadow-zinc-50" onSubmit={(ev) => void sendReport(ev)}>
+            <p className="text-xs font-semibold uppercase tracking-[0.32em] text-zinc-500">Safety · report outputs</p>
+            <p className="text-sm text-zinc-600">
+              Flag coercion, creepiness, harassment, or other policy issues. Optionally add context administrators can
+              act on.
+            </p>
+            <textarea
+              className="w-full rounded-3xl border border-zinc-200 px-5 py-4 text-base"
+              maxLength={4000}
+              onChange={(ev) => setReportDetail(ev.target.value)}
+              placeholder="Optional specifics (what worried you)."
+              rows={3}
+              value={reportDetail}
+            />
+            <button
+              className="rounded-full border border-zinc-900 px-6 py-3 text-xs font-semibold uppercase tracking-[0.24em]"
+              disabled={reportBusy || !lastId}
+              type="submit"
+            >
+              {reportBusy ? "Sending…" : "Submit moderation report"}
+            </button>
+            {reportMessage ? <p className="text-sm text-zinc-600">{reportMessage}</p> : null}
+          </form>
         </div>
       ) : null}
     </div>
