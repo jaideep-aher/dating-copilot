@@ -127,6 +127,13 @@ export default async function ContactDetailPage(props: PageProps) {
         </div>
       ) : null}
 
+      <div className="rounded-[30px] border border-emerald-100 bg-emerald-50/90 px-6 py-5 text-sm text-emerald-950 shadow-inner shadow-emerald-100">
+        <Link className="font-semibold text-emerald-950 underline-offset-4 hover:underline" href={`/contacts/${contact.id}/share-coach`}>
+          Build a coach context pack
+        </Link>
+        <span className="text-emerald-900"> — time-boxed link with only the pins and timeline rows you tick.</span>
+      </div>
+
       <section className="grid gap-10 lg:grid-cols-[0.92fr_minmax(0,1fr)]">
         <div className="space-y-16">
           <div className="space-y-6 rounded-[38px] border border-zinc-100 bg-white p-10 shadow-[0_50px_120px_rgba(10,17,62,0.08)]">

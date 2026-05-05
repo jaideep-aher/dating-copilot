@@ -53,6 +53,29 @@ export async function POST(req: Request) {
     switch (event.type) {
       case "checkout.session.completed": {
         const session = event.data.object as Stripe.Checkout.Session;
+
+        if (session.mode === "payment" && session.metadata?.checkout_kind === "coach_book") {
+          const bookingId = session.metadata.booking_id;
+          if (bookingId) {
+            await admin
+              .from("coach_bookings")
+              .update({
+                status: "paid",
+                paid_at: new Date().toISOString(),
+                amount_total_cents: session.amount_total ?? 0,
+                currency: typeof session.currency === "string" ? session.currency : "usd",
+                stripe_checkout_session_id: session.id,
+                updated_at: new Date().toISOString(),
+              })
+              .eq("id", bookingId);
+          }
+          break;
+        }
+
+        if (session.mode !== "subscription") {
+          break;
+        }
+
         const userId = session.metadata?.user_id;
         const customerId = typeof session.customer === "string" ? session.customer : session.customer?.id;
         const subId =

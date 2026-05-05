@@ -26,6 +26,12 @@ export default async function AppLayout({ children }: { children: React.ReactNod
             <Link className="hover:text-zinc-600 hover:underline underline-offset-[6px]" href="/contacts/from-screenshots">
               From screenshots
             </Link>
+            <Link className="hover:text-zinc-600 hover:underline underline-offset-[6px]" href="/coaches">
+              Coaches
+            </Link>
+            <Link className="hover:text-zinc-600 hover:underline underline-offset-[6px]" href="/coach">
+              Coach desk
+            </Link>
             <Link className="hover:text-zinc-600 hover:underline underline-offset-[6px]" href="/settings">
               Settings
             </Link>

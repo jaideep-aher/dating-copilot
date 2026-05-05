@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { updateProfile } from "@/app/actions/contacts";
+import { isAppAdmin } from "@/lib/admin-access";
 import { createClient } from "@/lib/supabase/server";
 
 export default async function SettingsPage() {
@@ -10,6 +11,8 @@ export default async function SettingsPage() {
   } = await supabase.auth.getUser();
 
   if (!user) redirect("/login");
+
+  const admin = await isAppAdmin(supabase, user);
 
   const { data: profile } = await supabase.from("profiles").select("display_name, default_tone").eq("id", user.id).single();
 
@@ -23,6 +26,11 @@ export default async function SettingsPage() {
           <Link className="underline-offset-4 hover:text-zinc-900 hover:underline" href="/settings/billing">
             Billing · data export
           </Link>
+          {admin ? (
+            <Link className="underline-offset-4 hover:text-zinc-900 hover:underline" href="/settings/admin/coaches">
+              Admin · coach verification
+            </Link>
+          ) : null}
         </div>
         <p className="mt-8 text-xs font-semibold uppercase tracking-[0.38em] text-amber-900">Settings</p>
         <h1 className="mt-4 text-4xl font-serif text-zinc-900">Tune your voice baseline</h1>

@@ -10,7 +10,9 @@ export async function updateSession(request: NextRequest) {
   const anon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
   const { pathname } = request.nextUrl;
   const requiresAuth =
-    pathname.startsWith("/contacts") || pathname.startsWith("/settings");
+    pathname.startsWith("/contacts") ||
+    pathname.startsWith("/settings") ||
+    pathname.startsWith("/coach");
 
   if (requiresAuth && (!url?.length || !anon?.length)) {
     const u = request.nextUrl.clone();

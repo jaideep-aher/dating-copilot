@@ -40,14 +40,20 @@ export default async function LandingPage() {
         </Link>
         <Link
           className="inline-flex h-11 items-center justify-center rounded-full border border-zinc-300 px-6 text-sm font-medium text-zinc-900 transition hover:border-zinc-400 hover:bg-white"
+          href="/coaches"
+        >
+          Human coaches · directory
+        </Link>
+        <Link
+          className="inline-flex h-11 items-center justify-center rounded-full border border-zinc-300 px-6 text-sm font-medium text-zinc-900 transition hover:border-zinc-400 hover:bg-white"
           href="/setup-required"
         >
           Read Supabase checklist
         </Link>
       </div>
       <p className="mt-14 text-xs text-zinc-500">
-        Responsible use: only upload chats you&apos;re allowed to reuse. Humans-as-coaches come in later PRD stages —
-        this codebase covers Stage&nbsp;1.
+        Responsible use: only upload chats you&apos;re allowed to reuse. Paid human coaching arrives in Stage&nbsp;4 — see
+        the public coach roster after migrations run.
       </p>
     </div>
   );
